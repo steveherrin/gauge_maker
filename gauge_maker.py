@@ -185,10 +185,11 @@ class GaugeDrawer(object):
                 .format(self._scale(thick)))
 
     def _get_major_tick_limits(self, value, length):
-        start = self._get_point_from_value(value)
-        radial = start - self.center
+        point = self._get_point_from_value(value)
+        radial = point - self.center
         radial_dir = radial / radial.norm
-        end = start + length*radial_dir
+        start = point - 0.5 * self.thick_line * radial_dir
+        end = point + length*radial_dir
         return start, end
 
     def _scale(self, value):
