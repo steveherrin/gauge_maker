@@ -35,6 +35,9 @@ class Point(object):
         return self * other
 
     def __div__(self, other):
+        return Point(*(self.vector // other))
+
+    def __truediv__(self, other):
         return Point(*(self.vector / other))
 
     def __neg__(self):
