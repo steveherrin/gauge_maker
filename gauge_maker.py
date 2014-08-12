@@ -1,3 +1,5 @@
+from __future__ import (print_function, division, absolute_import)
+from vector_drawer import SVGDrawer
 import numpy as np
 from math import pi, atan2, cos, sin
 
@@ -136,56 +138,50 @@ class GaugeDrawer(object):
         return self._get_point_from_angle(angle)
 
     def draw(self, filename):
+        svg = SVGDrawer(self._scale(self.width), self._scale(self.height))
+        self._draw_arc(svg)
+        self._draw_major_ticks(svg)
+        self._draw_minor_ticks(svg)
+        self._draw_labels(svg)
         with open(filename, 'w') as f:
-            f.write('<svg height="{}" width="{}">\n'
-                    .format(self._scale(self.height),
-                            self._scale(self.width)))
-            self._draw_arc(f)
-            self._draw_major_ticks(f)
-            self._draw_minor_ticks(f)
-            self._draw_labels(f)
-            f.write('</svg>\n')
+            svg.save(f)
 
-    def _draw_arc(self, f):
-        f.write('<path d="M{0.x},{0.y} '.format(self._scale_pt(self.end_pt)))
-        for val in reversed(self.major_tick_values[:-1]):
-            f.write('A{0},{0} 0 0,0 {1.x},{1.y} '
-                    .format(self._scale(self.radius),
-                            self._scale_pt(self._get_point_from_value(val))))
-        f.write('" fill="none" stroke="black" stroke-width="{}"/>\n'
-                .format(self._scale(self.thick_line)))
+    def _draw_arc(self, svg):
+        # start at end so the curves are convex
+        path = svg.draw_path(start=self._scale_pt(self.end_pt),
+                             fill='none', color='black',
+                             width=self._scale(self.thick_line))
+        path.arc_to(self._scale_pt(self.zero_pt),
+                    self._scale(self.radius))
 
-    def _draw_major_ticks(self, f):
+    def _draw_major_ticks(self, svg):
         for tick_value in self.major_tick_values:
-            self._draw_tick(f, tick_value, self.major_tick_length,
+            self._draw_tick(svg, tick_value, self.major_tick_length,
                             self.thick_line)
 
-    def _draw_minor_ticks(self, f):
+    def _draw_minor_ticks(self, svg):
         for tick_value in self.minor_tick_values:
-            self._draw_tick(f, tick_value, self.minor_tick_length,
+            self._draw_tick(svg, tick_value, self.minor_tick_length,
                             self.thin_line)
 
-    def _draw_labels(self, f):
+    def _draw_tick(self, svg, value, length, thick):
+        start, end = self._get_major_tick_limits(value, length)
+        svg.draw_line(self._scale_pt(start),
+                      self._scale_pt(end),
+                      color='black', width=self._scale(thick))
+
+    def _draw_labels(self, svg):
         for value, label in zip(self.major_tick_values,
                                 self.major_tick_labels):
             _, text_center = self._get_major_tick_limits(
                 value, 1.15 * self.major_tick_length)
-            f.write('<text x="{0.x}" y="{0.y}" '
-                    .format(self._scale_pt(text_center)))
-            f.write('style="text-anchor: middle; font-size: {};" '
-                    .format(self._scale(self.text_size)))
-            f.write('transform="rotate({0} {1.x},{1.y})">\n'.format(
-                int(round(180.0/pi * self._get_angle_from_value(value))),
-                self._scale_pt(text_center)))
-            f.write(label)
-            f.write('\n</text>\n')
-
-    def _draw_tick(self, f, value, length, thick):
-        start, end = self._get_major_tick_limits(value, length)
-        f.write('<line x1="{0.x}" y1="{0.y}" '.format(self._scale_pt(start)))
-        f.write('x2="{0.x}" y2="{0.y}" '.format(self._scale_pt(end)))
-        f.write('style="stroke:black;stroke-width:{}" />\n'
-                .format(self._scale(thick)))
+            angle = 180.0 / pi * self._get_angle_from_value(value)
+            svg.draw_text(self._scale_pt(text_center), label,
+                          size=self._scale(self.text_size),
+                          color='black',
+                          family='Helvetica',
+                          anchor='middle',
+                          rotate_angle=angle)
 
     def _get_major_tick_limits(self, value, length):
         point = self._get_point_from_value(value)
