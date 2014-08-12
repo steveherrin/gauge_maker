@@ -245,7 +245,7 @@ def divide_interval(lo, hi, n, include_lo=True, include_hi=False):
         n += 1
     if not include_hi:
         n += 1
-    values = [lo + i * float(hi - lo) / (n - 1) for i in xrange(n)]
+    values = [lo + i * float(hi - lo) / (n - 1) for i in range(n)]
     if not include_lo:
         values.pop(0)
     if not include_hi:
