@@ -1,9 +1,10 @@
 from __future__ import (print_function, division, absolute_import)
+from xml.sax.saxutils import escape as _escape
 
 class VectorDrawer(object):
     def save(self, file):
         if hasattr(file, 'write'):
-            self._save(f)
+            self._save(file)
         else:
             try:
                 with open(file, 'wb') as f:
@@ -24,7 +25,7 @@ class SVGDrawer(VectorDrawer):
 
     def _save(self, buf):
         buf.write('<svg height="{}" width="{}">\n'
-                  .format(height, width))
+                  .format(self.height, self.width))
         for element in self._elements:
             element.save(buf)
         buf.write('</svg>\n')
@@ -44,6 +45,14 @@ class SVGDrawer(VectorDrawer):
         self._elements.append(new_path)
         return new_path
 
+    def draw_text(self, pt, text, size=None, color=None, family=None,
+                  anchor=None, rotate_angle=0, rotate_center=None):
+        new_text = SVGText(pt, text=text, size=size, color=color,
+                           family=family, anchor=anchor,
+                           rotate_angle=rotate_angle,
+                           rotate_center=rotate_center)
+        self._elements.append(new_text)
+
 
 class SVGElement(object):
     def save(self, buf):
@@ -62,12 +71,12 @@ class SVGLine(SVGElement):
                              .format("' ,'".join(style)))
 
     def save(self, buf):
-        buf.write('<line x1="{0.x}" y1="{0.y}" '.format(start))
-        buf.write('x2="{0.x}" y2="{0.y}" '.format(end))
+        buf.write('<line x1="{0.x}" y1="{0.y}" '.format(self.start))
+        buf.write('x2="{0.x}" y2="{0.y}" '.format(self.end))
         buf.write('style="')
-        for key, value in self.style:
+        for key, value in self.style.items():
             buf.write('{}:{};'.format(key, value))
-        buf.write(' />\n')
+        buf.write('" />\n')
 
 class SVGPath(SVGElement):
     def __init__(self, start=None, actions=None, **style):
@@ -90,7 +99,7 @@ class SVGPath(SVGElement):
         for action in self._actions:
             buf.write(' ' + action.get_string())
         buf.write('"')
-        for key, value in self.style:
+        for key, value in self.style.items():
             buf.write(' {}="{}"'.format(key, value))
         buf.write(' />\n')
 
@@ -107,6 +116,34 @@ class SVGPath(SVGElement):
 
     def close_path(self):
         self._actions.append(SVGPathClose())
+
+class SVGText(SVGElement):
+    def __init__(self, pt, text, rotate_angle=0, rotate_center=None, **style):
+        self.pt = pt
+        self.text = text
+        self.rotate_center = rotate_center or pt
+        self.rotate_angle = rotate_angle
+        self.style = {}
+        _move_between_dicts(style, 'color', self.style, 'fill')
+        _move_between_dicts(style, 'anchor', self.style, 'text-anchor')
+        _move_between_dicts(style, 'family', self.style, 'font-family')
+        _move_between_dicts(style, 'size', self.style, 'font-size')
+        if len(style) > 0:
+            raise ValueError("Unsupported style attributes: '{}'"
+                             .format("' ,'".join(style)))
+
+    def save(self, buf):
+        buf.write('<text x="{0.x}" y="{0.y}" '.format(self.pt))
+        buf.write('style="')
+        for key, value in self.style.items():
+            buf.write('{}:{};'.format(key, value))
+        buf.write('"')
+        if self.rotate_angle:
+            buf.write(' transform="rotate({0} {1.x},{1.y})"'
+                      .format(self.rotate_angle, self.rotate_center))
+        buf.write('>\n')
+        buf.write(_escape(self.text))
+        buf.write('\n</text>\n')
 
 
 class SVGPathAction(object):
@@ -131,7 +168,7 @@ class SVGPathLine(SVGPathAction):
     def get_string(self):
         return 'L{0.x},{0.y}'.format(self.pt)
 
-def SVGPathArc(SVGPathAction):
+class SVGPathArc(SVGPathAction):
     def __init__(self, pt, radius_x, radius_y=None,
                  rotation=0, large_arc=False, sweep=False):
         self.pt = pt
